@@ -1,0 +1,4 @@
+== Reproducer for issue HHH-14556
+
+https://hibernate.atlassian.net/browse/HHH-14556
+
