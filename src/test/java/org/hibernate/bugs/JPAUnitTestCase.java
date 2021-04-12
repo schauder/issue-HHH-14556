@@ -1,16 +1,21 @@
 package org.hibernate.bugs;
 
+import org.hibernate.Session;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
+import java.sql.Connection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -20,10 +25,24 @@ public class JPAUnitTestCase {
 
 	private EntityManagerFactory entityManagerFactory;
 
+	String sql = "select\n" +
+			"        entityone0_.id as col_0_0_,\n" +
+			"        entityone0_.name as col_1_0_,\n" +
+			"        entityone0_.id as col_2_0_,\n" +
+			"        entitytwo1_.id as id1_1_,\n" +
+			"        entitytwo1_.name as name2_1_ \n" +
+			"    from\n" +
+			"        EntityOne entityone0_ \n" +
+			"    inner join\n" +
+			"        EntityTwo entitytwo1_ \n" +
+			"            on entityone0_.id=entitytwo1_.id";
+
+
 	@Before
 	public void init() {
 
 		entityManagerFactory = Persistence.createEntityManagerFactory("templatePU");
+		initData();
 
 	}
 
@@ -36,19 +55,6 @@ public class JPAUnitTestCase {
 	// Add your tests, using standard JUnit.
 	@Test
 	public void hhh123Test() {
-
-		withEm(em -> {
-
-			EntityTwo a2 = new EntityTwo();
-			a2.name = "alpha 2";
-
-			EntityOne alpha = new EntityOne();
-			alpha.name = "alpha";
-			alpha.two = a2;
-
-			em.persist(alpha);
-
-		});
 
 
 		withEm(em -> {
@@ -66,6 +72,41 @@ public class JPAUnitTestCase {
 			});
 		});
 
+	}
+
+	@Test
+	public void testDataIsActuallyAvailable() {
+		withEm(em -> {
+			Session session = (Session) em.getDelegate();
+			session.doWork(con -> {
+				JdbcTemplate template = new JdbcTemplate(new SingleConnectionDataSource(con, false));
+				AtomicBoolean atLeastOne = new AtomicBoolean(false);
+				template.query(sql, resultSet -> {
+					int count = resultSet.getMetaData().getColumnCount();
+					for (int i = 1; i <= count; i++) {
+						Assert.assertNotNull("column " + i + " is null", resultSet.getObject(i));
+						atLeastOne.set(true);
+					}
+				});
+				Assert.assertTrue(atLeastOne.get());
+			});
+		});
+	}
+
+
+	private void initData() {
+		withEm(em -> {
+
+			EntityTwo a2 = new EntityTwo();
+			a2.name = "alpha 2";
+
+			EntityOne alpha = new EntityOne();
+			alpha.name = "alpha";
+			alpha.two = a2;
+
+			em.persist(alpha);
+
+		});
 	}
 
 	void withEm(Consumer<EntityManager> consumer) {
