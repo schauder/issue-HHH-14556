@@ -1,4 +1,5 @@
-== Reproducer for issue HHH-14556
+== Reproducer for issue HHH-14556 Select via Criteria API does not properly retrieve one to one reference
+
 
 https://hibernate.atlassian.net/browse/HHH-14556
 
